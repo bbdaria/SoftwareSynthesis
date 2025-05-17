@@ -59,8 +59,33 @@ Inductive Result :=
   | Mismatch : Term -> Ty -> Ty -> Result
   | ExpectedArrow : Term -> Ty -> Result.
 
-Fixpoint typecheck (e : Term) (env : Valuation) :=
-  (* TODO *)
+Definition extend_env (v : Var) (t : Ty) (env : Valuation) : Valuation :=
+  fun v' => if eq_var v v' then t else env v'.
+  
+Fixpoint typecheck (e : Term) (env : Valuation): Result :=
+  match e with 
+    | TVar v => Ok (env v)
+    | Abs (v, ty1) body => 
+      match typecheck body (extend_env v ty1 env) with
+      | Ok ty2 => Ok (Arrow ty1 ty2)
+      | err => err
+      end
+    | App e1 e2 =>
+      match typecheck e1 env with
+      | Ok ty1 =>
+          match ty1 with
+          | Arrow ty_arg ty_res =>
+              match typecheck e2 env with
+              | Ok ty2 =>
+                  if eq_ty ty2 ty_arg then Ok ty_res
+                  else Mismatch e2 ty_arg ty2
+              | err => err
+              end
+          | _ => ExpectedArrow e1 ty1
+          end
+      | err => err
+      end
+  end.
 
 
 (* Examples *)
