@@ -63,9 +63,13 @@ Lemma warm_up a0 b0 : hoare (fun s => s a = a0 /\ s b = b0)
   (* Hint 1: use hoare_weaken_l (from hoare.v).
    * Hint 2: you can switch subgoals with <num>: { ... }. 
    *)
-
-
-
+Proof.
+  apply hoare_weaken_l with (P := subst (fun s => s a = a0 - b0) a [$a `-` $b]).
+  - intros s [Ha Hb].
+    simpl.
+    lia.
+  - apply hoare_assign.
+Qed.
 
 
 Module MainProof.
@@ -80,8 +84,6 @@ Module MainProof.
   (* ----  some free lemmas!  (you don't have to prove them)  ---- *)
   Lemma gt0_le x y : gt01 x y = 0 <-> x <= y.  Admitted.
   Lemma gt1_gt x y : gt01 x y <> 0 <-> x > y.  Admitted.
-  Lemma ne0_eq x y : ne01 x y = 0 <-> x = y.  Admitted.
-  Lemma ne1_ne x y : ne01 x y <> 0 <-> x <> y.  Admitted.
   Lemma div_sub a b z : (z | a) -> (z | b) -> (z | a - b).  Admitted.
   Lemma sub_div1 a b z : a >= b -> (z | a) -> (z | a - b) -> (z | b).  Admitted.
   Lemma sub_div2 a b z : a >= b -> (z | b) -> (z | a - b) -> (z | a).  Admitted.
@@ -96,7 +98,7 @@ Module MainProof.
                         forall z, (z | a0) /\ (z | b0) <-> (z | a) /\ (z | b - a).
   Admitted.
 
-  (* Hint 3: Use aux1 and aux2 to prove euclid_inv.
+  (* Hint 3: Use aux1 and aux2 to prove eucliv_inv.
    *         Then use euclid_inv to prove euclid_post.
    *         Time permitting, go back to aux1 and aux2 and prove them.
    *         Use the other lemmas where appropriate.
@@ -105,17 +107,62 @@ Module MainProof.
   Lemma euclid_inv a0 b0 : hoare (fun s => linv a0 b0 s /\ s a <> s b)
                                  c
                                  (linv a0 b0).
-
+  Proof.
+    unfold linv, c.
+    apply hoare_if.
+    - apply hoare_weaken_l with (P := subst (linv a0 b0) a [$a `-` $b]).
+      + intros s [[Hinv Hneq] Hgt].
+        unfold subst, linv, set, sem.
+        simpl.
+        apply gt1_gt in Hgt.
+        apply aux1.
+        exact Hinv.
+        exact Hgt.
+      + apply hoare_assign.
+    - apply hoare_weaken_l with (P := subst (linv a0 b0) b [$b `-` $a]).
+      + intros s [[Hinv Hneq] Hgt].
+        unfold subst, linv, set, sem.
+        simpl.
+        apply gt0_le in Hgt.
+        assert (s a < s b) by lia.
+        apply aux2.
+        * exact Hinv.
+        * exact H.
+      + apply hoare_assign.  
+  Qed.
 
 
 
   Theorem euclid_post a0 b0 : hoare (fun s => s a = a0 /\ s b = b0)
                                     euclid_cmd
                                     (fun s => forall z, (z | a0) /\ (z | b0) <-> (z | s a)).
-
+  Proof.     
+    unfold euclid_cmd.
+    apply hoare_weaken_l with (P := linv a0 b0).
+    - intros s [Ha Hb].
+      unfold linv. 
+      intros z. 
+      rewrite Ha, Hb. 
+      tauto.
+    - apply hoare_weaken_r with (Q := fun s => linv a0 b0 s /\ sem [$a `!=` $b] s = 0).
+      + apply hoare_while.
+        apply hoare_weaken_l with (P := fun s => linv a0 b0 s /\ s a <> s b).
+        * intros s [Hinv Hcond].
+          unfold sem in Hcond; simpl in Hcond.
+          unfold ne01 in Hcond.
+          destruct (eq_dec (s a) (s b)) as [Heq | Hneq].
+          { exfalso. apply Hcond. tauto. }
+          { tauto. }
+        * apply euclid_inv.
+     + intros s [Hinv Hdone] z.
+       unfold linv in Hinv.
+       specialize (Hinv z).
+       unfold sem in Hdone.
+       unfold ne01 in Hdone.
+       destruct (eq_dec (s a) (s b)) as [Heq | Hneq].
+       * rewrite <- Heq in Hinv. 
+         tauto.
+       * exfalso. discriminate Hdone.
+    Qed.
     
 End MainProof.
-
-
-
-
