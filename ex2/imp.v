@@ -58,22 +58,12 @@ Section ReflexiveTransitiveClosureAltDef.
   Variable D : Set.
   Variable R : D -> D -> Prop.
 
-  Inductive tc' : D -> D -> Prop :=
-    tc'_refl : forall s, tc' s s
-  | tc'_step : forall s u t, R s u -> tc' u t -> tc' s t.
+  Inductive tc : D -> D -> Prop :=
+    tc_refl : forall s, tc s s
+  | tc_step : forall s u t, R s u -> tc u t -> tc s t.
 
 End ReflexiveTransitiveClosureAltDef.
 
-Section ReflexiveTransitiveClosureDef.
-
-  Variable D : Set.
-  Variable R : D -> D -> Prop.
-
-  Inductive tc : D -> D -> Prop :=
-    tc_refl : forall s, tc s s
-  | tc_step : forall s u t, tc s u -> R u t -> tc s t.
-
-End ReflexiveTransitiveClosureDef.
 
 Definition eq_var_dec : forall (v1 v2 : var), {v1 = v2} + {v1 <> v2}.
 Proof. decide equality. Qed.
@@ -100,16 +90,209 @@ Inductive sos : (state * cmd) -> (state * cmd) -> Prop :=
     sem e st <> 0 -> sos (st, assume e) (st, skip).
  
 Inductive step : state -> state -> Prop := 
-  | cons : forall st st', sos (st, euclid_body) (st', skip) -> step st st'.
+  | cons : forall st st', tc sos (st, euclid_body) (st', skip) -> step st st'.
   
-Lemma Q4 : forall a0 b0 s s', s a = a0 -> s b = b0 -> tc' step s s' -> s' a = s' b -> gcd a0 b0 (s' a).
+Lemma alt_step: forall s u, step s u -> 
+  (
+      (s a < s b -> (u a = s a /\ u b = s b - s a)) 
+      /\
+      (s a > s b -> (u b = s b /\ u a = s a - s b))
+  ). 
 Proof.
-  intros a0 b0 s s' Ha0 Hb0 Hstepss Hskip.
-  induction Hstepss.
-  - assert (Heq : a0 = b0) by lia.
-    rewrite Ha0.
-    rewrite Heq.
-    apply base.
-  - inversion H.
-    inversion H0.
+  (* extract *)
+  intros s u Hstep.
+  inversion Hstep. subst.
+  inversion H. subst.
+  inversion H0. subst.
+  inversion H6. subst.
+  inversion H1. subst.
+  inversion H2. subst.
+  
+  clear Hstep H H0 H6 H2 H4.
+  rename H10 into H.
+  
+  inversion H. subst.
+  rename H3 into Hneq.
+  rename H4 into Hsos.
+  clear H2 H1 H6 H0 Hstep H.
+  
+  inversion Hsos. subst.
+  inversion H. subst.
+  rename H6 into Hgt.
+  rename H0 into Htcsos.
+  clear H Hsos.
+  
+  - inversion Htcsos. subst.
+    inversion H. subst.
+    inversion H0. subst.
+    clear H0 H Htcsos.
+    + assert (st' a > st' b).
+      {
+        unfold sem in Hgt.
+        unfold gt01 in Hgt.
+        destruct gt_dec.
+        - assumption.
+        - contradiction.
+      }
+      
+      firstorder.
+      simpl in *.
+      unfold ne01 in Hneq.
+      unfold gt01 in Hgt.
+      destruct eq_dec in Hneq.
+      destruct gt_dec in Hgt.
+      * lia.
+      * lia. 
+      * lia.
+      * lia.
+      * unfold update.
+        destruct eq_var_dec as [a1 | a2].
+        {
+          simpl in *.
+          unfold ne01 in Hneq.
+          unfold gt01 in Hgt.
+          destruct eq_dec in Hneq.
+          destruct gt_dec in Hgt.
+          { contradiction. }
+          { contradiction. }
+          { rewrite a1 in n0. contradiction. }
+        }
+        tauto.
+      * unfold update.
+        destruct eq_var_dec.
+        { tauto. }
+        exfalso.
+        tauto.
+    + clear H0 H H3 H4 Htcsos.
+      rename H1 into Hsos.
+      rename H2 into Htcsos.
+      inversion Hsos.
+  
+  - subst.
+    clear H Hsos.
+    rename H0 into Htcsos.
+    rename H6 into Hgt.
+    inversion Htcsos. subst.
+    inversion H. subst.
+    inversion H0. subst.
+    clear Htcsos H H0.
+    + firstorder.
+      * unfold update.
+        unfold sem in *.
+        unfold ne01 in Hneq.
+        unfold gt01 in Hgt.
+        destruct eq_dec in Hneq.
+        destruct gt_dec in Hgt.
+        { contradiction. }
+        { contradiction. }
+        {
+          destruct gt_dec in Hgt.
+          { contradiction. }
+          {
+            destruct eq_var_dec.
+            { rewrite e in n0. contradiction. }
+            { tauto. }
+          }
+        }
+      * unfold update.
+        destruct eq_var_dec.
+        { tauto. }
+        { contradiction. }
+      * unfold update.
+        destruct eq_var_dec.
+        {
+          unfold sem in *.
+          unfold ne01 in Hneq.
+          unfold gt01 in Hgt.
+          destruct eq_dec in Hneq.
+          destruct gt_dec in Hgt.
+          { contradiction. }
+          { contradiction. }
+          { 
+            destruct gt_dec in Hgt.
+            { contradiction. }
+            { contradiction. }
+          }
+        }
+        tauto.
+      * unfold update.
+        destruct eq_var_dec.
+        { rewrite e. tauto. }
+        { 
+          unfold sem in *.
+          unfold ne01 in Hneq.
+          unfold gt01 in Hgt.
+          destruct eq_dec in Hneq.
+          destruct gt_dec in Hgt.
+          { contradiction. }
+          { contradiction. }
+          { 
+            destruct gt_dec in Hgt.
+            { contradiction. }
+            { contradiction. }
+          }
+        }
+        
+    + clear Htcsos H3 H4 H H0. 
+    inversion H1; clear H1; subst.
+Qed.
+
+
+
+
+Lemma alt_step_ass: forall s u, step s u -> s a <> s b.
+Proof.
+  intros.
+  inversion H.
+  subst.
+  unfold euclid_body in H0.
+  inversion H0 as [| s1 s2 s3 Hsos Htc' ]. subst.
+  
+  inversion Hsos. subst.
+  inversion H5. subst.
+  unfold sem in H2.
+  rename H2 into Goal.
+  unfold ne01 in Goal.
+  destruct (eq_dec (st' a) (st' b)).
+  - subst. simpl in H. contradiction.
+  - assumption.
+Qed.
+
+
+Theorem Q4 : forall a0 b0 s s', s a = a0 -> s b = b0 -> tc step s s' -> s' a = s' b -> gcd a0 b0 (s' a).
+Proof.
+  intros a0 b0 s s' Ha Hb Htcstep Hskip. subst.
+  induction Htcstep.
+  
+  - rewrite Hskip. apply base.
+  - assert (gcd (u a) (u b) (t0 a)) as Hgcdfin.
+    { firstorder. }
+    
+    apply alt_step in H as H0.
+    rename H0 into Hcond.
+    destruct Hcond.
+    rename H0 into Hcondlt.
+    rename H1 into Hcondgt.
+    destruct (Nat.ltb_spec (s a) (s b)).
+    + destruct Hcondlt.
+      * exact H0.
+      * rewrite <- H1.
+        assert (s b = u a + u b) by lia.
+        rewrite H3.
+        apply step_b.
+        exact Hgcdfin.
+    + destruct (Nat.eqb_spec (s a) (s b)).
+      * assert (s a <> s b).
+        apply (alt_step_ass H).
+        contradiction.
+      * assert (s a > s b) by lia.
+        destruct Hcondgt.
+        { exact H1. }
+        { 
+          rewrite <- H2.
+          assert (s a = u a + u b) by lia.
+          rewrite H4.
+          apply step_a.
+          exact Hgcdfin.
+        }
 Qed.
